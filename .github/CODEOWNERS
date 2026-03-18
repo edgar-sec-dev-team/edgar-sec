@@ -1,0 +1,30 @@
+# Global fallback
+* @edgar-sec-dev-team/core
+
+# Governance / packaging / release control
+.github/ @edgar-sec-dev-team/core
+pyproject.toml @edgar-sec-dev-team/core
+LICENSE @edgar-sec-dev-team/core
+README.md @edgar-sec-dev-team/core
+SECURITY.md @edgar-sec-dev-team/core
+CONTRIBUTING.md @edgar-sec-dev-team/core
+GOVERNANCE.md @edgar-sec-dev-team/core
+
+# Source tree
+src/edgar_sec/_core/ @edgar-sec-dev-team/core @edgar-sec-dev-team/maintainers
+src/edgar_sec/_xbrl/ @edgar-sec-dev-team/core
+src/edgar_sec/integrations/ @edgar-sec-dev-team/core @edgar-sec-dev-team/maintainers
+src/edgar_sec/utils/ @edgar-sec-dev-team/core @edgar-sec-dev-team/maintainers
+
+# Tests
+tests/core/ @edgar-sec-dev-team/core @edgar-sec-dev-team/maintainers
+tests/xbrl/ @edgar-sec-dev-team/core
+tests/integrations/ @edgar-sec-dev-team/core @edgar-sec-dev-team/maintainers
+tests/utils/ @edgar-sec-dev-team/core @edgar-sec-dev-team/maintainers
+
+# Documentation
+docs/ @edgar-sec-dev-team/core @edgar-sec-dev-team/maintainers
+*.md @edgar-sec-dev-team/core @edgar-sec-dev-team/maintainers
+
+# CI/CD
+.github/workflows/ @edgar-sec-dev-team/core
