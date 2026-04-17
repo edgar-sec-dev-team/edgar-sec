@@ -1,0 +1,155 @@
+name: Repo Activity to Discord
+
+on:
+  push:
+    branches:
+      - '**'
+    tags:
+      - '**'
+  pull_request:
+    types: [opened, reopened, synchronize, closed, ready_for_review, review_requested]
+  create:
+  delete:
+  release:
+    types: [published, prereleased, released]
+  issues:
+    types: [opened, edited, closed, reopened]
+  discussion:
+    types: [created, edited]
+  discussion_comment:
+    types: [created, edited]
+
+permissions:
+  contents: read
+  pull-requests: read
+  issues: read
+  discussions: read
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Build Discord payload
+        id: payload
+        shell: bash
+        run: |
+          EVENT="${{ github.event_name }}"
+          ACTION="${{ github.event.action }}"
+          REPO="${{ github.repository }}"
+          ACTOR="${{ github.actor }}"
+          SERVER_URL="${{ github.server_url }}"
+          REPO_URL="${{ github.server_url }}/${{ github.repository }}"
+          COLOR=3447003
+          TITLE=""
+          DESCRIPTION=""
+          URL="$REPO_URL"
+
+          if [ "$EVENT" = "push" ]; then
+            REF_NAME="${{ github.ref_name }}"
+            BEFORE="${{ github.event.before }}"
+            AFTER="${{ github.event.after }}"
+            COMPARE_URL="${{ github.event.compare }}"
+            URL="$COMPARE_URL"
+
+            COMMIT_LINES=$(jq -r '
+              .commits[:10][] |
+              "- `" + (.id[0:7]) + "` " + .message + " — **" + .author.name + "**"
+            ' "$GITHUB_EVENT_PATH")
+
+            COMMIT_COUNT=$(jq '.commits | length' "$GITHUB_EVENT_PATH")
+
+            TITLE="Push to ${REF_NAME}"
+            DESCRIPTION="**Repo:** ${REPO}\n**Actor:** ${ACTOR}\n**Commits:** ${COMMIT_COUNT}\n\n${COMMIT_LINES}"
+
+          elif [ "$EVENT" = "pull_request" ]; then
+            PR_TITLE=$(jq -r '.pull_request.title' "$GITHUB_EVENT_PATH")
+            PR_URL=$(jq -r '.pull_request.html_url' "$GITHUB_EVENT_PATH")
+            PR_NUM=$(jq -r '.pull_request.number' "$GITHUB_EVENT_PATH")
+            MERGED=$(jq -r '.pull_request.merged' "$GITHUB_EVENT_PATH")
+            BASE=$(jq -r '.pull_request.base.ref' "$GITHUB_EVENT_PATH")
+            HEAD=$(jq -r '.pull_request.head.ref' "$GITHUB_EVENT_PATH")
+            URL="$PR_URL"
+
+            if [ "$ACTION" = "closed" ] && [ "$MERGED" = "true" ]; then
+              TITLE="PR merged: #${PR_NUM}"
+              DESCRIPTION="**${PR_TITLE}**\n**${HEAD}** → **${BASE}**\nMerged by **${ACTOR}**"
+              COLOR=5763719
+            else
+              TITLE="PR ${ACTION}: #${PR_NUM}"
+              DESCRIPTION="**${PR_TITLE}**\n**${HEAD}** → **${BASE}**\nBy **${ACTOR}**"
+            fi
+
+          elif [ "$EVENT" = "create" ]; then
+            REF_TYPE=$(jq -r '.ref_type' "$GITHUB_EVENT_PATH")
+            REF=$(jq -r '.ref' "$GITHUB_EVENT_PATH")
+            TITLE="Created ${REF_TYPE}: ${REF}"
+            DESCRIPTION="**Repo:** ${REPO}\n**Actor:** ${ACTOR}"
+
+          elif [ "$EVENT" = "delete" ]; then
+            REF_TYPE=$(jq -r '.ref_type' "$GITHUB_EVENT_PATH")
+            REF=$(jq -r '.ref' "$GITHUB_EVENT_PATH")
+            TITLE="Deleted ${REF_TYPE}: ${REF}"
+            DESCRIPTION="**Repo:** ${REPO}\n**Actor:** ${ACTOR}"
+            COLOR=15158332
+
+          elif [ "$EVENT" = "release" ]; then
+            TAG=$(jq -r '.release.tag_name' "$GITHUB_EVENT_PATH")
+            NAME=$(jq -r '.release.name // .release.tag_name' "$GITHUB_EVENT_PATH")
+            REL_URL=$(jq -r '.release.html_url' "$GITHUB_EVENT_PATH")
+            URL="$REL_URL"
+            TITLE="Release ${ACTION}: ${TAG}"
+            DESCRIPTION="**${NAME}**\nPublished by **${ACTOR}**"
+            COLOR=10181046
+
+          elif [ "$EVENT" = "issues" ]; then
+            NUM=$(jq -r '.issue.number' "$GITHUB_EVENT_PATH")
+            ITITLE=$(jq -r '.issue.title' "$GITHUB_EVENT_PATH")
+            IURL=$(jq -r '.issue.html_url' "$GITHUB_EVENT_PATH")
+            URL="$IURL"
+            TITLE="Issue ${ACTION}: #${NUM}"
+            DESCRIPTION="**${ITITLE}**\nBy **${ACTOR}**"
+
+          elif [ "$EVENT" = "discussion" ]; then
+            DTITLE=$(jq -r '.discussion.title' "$GITHUB_EVENT_PATH")
+            DURL=$(jq -r '.discussion.html_url' "$GITHUB_EVENT_PATH")
+            URL="$DURL"
+            TITLE="Discussion ${ACTION}"
+            DESCRIPTION="**${DTITLE}**\nBy **${ACTOR}**"
+
+          elif [ "$EVENT" = "discussion_comment" ]; then
+            DURL=$(jq -r '.comment.html_url' "$GITHUB_EVENT_PATH")
+            URL="$DURL"
+            TITLE="Discussion comment ${ACTION}"
+            DESCRIPTION="By **${ACTOR}**"
+
+          else
+            TITLE="${EVENT}"
+            DESCRIPTION="Action: ${ACTION}\nActor: ${ACTOR}"
+          fi
+
+          jq -n \
+            --arg username "GitHub • edgar-sec" \
+            --arg title "$TITLE" \
+            --arg description "$DESCRIPTION" \
+            --arg url "$URL" \
+            --argjson color "$COLOR" \
+            '{
+              username: $username,
+              embeds: [
+                {
+                  title: $title,
+                  description: $description,
+                  url: $url,
+                  color: $color
+                }
+              ]
+            }' > discord_payload.json
+
+      - name: Send to Discord
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+        run: |
+          curl -fsSL \
+            -H "Content-Type: application/json" \
+            -d @discord_payload.json \
+            "$DISCORD_WEBHOOK_URL"
