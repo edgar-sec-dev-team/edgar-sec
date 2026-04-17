@@ -10,11 +10,11 @@ Overall coverage: 100%
 
 ```
 ============================= test session starts ==============================
-platform linux -- Python 3.11.15, pytest-8.4.1, pluggy-1.6.0
+platform linux -- Python 3.11.15, pytest-9.0.3, pluggy-1.6.0
 rootdir: /home/runner/work/edgar-sec/edgar-sec
 configfile: pyproject.toml
-plugins: anyio-4.10.0, asyncio-1.1.0, hypothesis-6.137.1, cov-6.2.1, mock-3.14.1
-asyncio: mode=Mode.STRICT, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+plugins: asyncio-1.3.0, cov-7.1.0, hypothesis-6.152.1, mock-3.15.1, anyio-4.13.0
+asyncio: mode=Mode.STRICT, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
 collected 83 items
 
 tests/clients_test.py .............................................      [ 54%]
@@ -34,7 +34,7 @@ src/edgar_sec/objects.py       209      0   100%
 ------------------------------------------------
 TOTAL                          581      0   100%
 Coverage XML written to file coverage.xml
-============================== 83 passed in 5.82s ==============================
+============================== 83 passed in 5.87s ==============================
 ```
 
 ## Running Test Coverage Locally
