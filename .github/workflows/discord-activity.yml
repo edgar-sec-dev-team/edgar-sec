@@ -3,11 +3,19 @@ name: Repo Activity to Discord
 on:
   push:
     branches:
-      - '**'
+      - "**"
     tags:
-      - '**'
+      - "**"
   pull_request:
-    types: [opened, reopened, synchronize, closed, ready_for_review, review_requested]
+    types:
+      [
+        opened,
+        reopened,
+        synchronize,
+        closed,
+        ready_for_review,
+        review_requested,
+      ]
   create:
   delete:
   release:
@@ -28,38 +36,69 @@ permissions:
 jobs:
   notify:
     runs-on: ubuntu-latest
+
     steps:
       - name: Build Discord payload
-        id: payload
         shell: bash
         run: |
           EVENT="${{ github.event_name }}"
           ACTION="${{ github.event.action }}"
           REPO="${{ github.repository }}"
           ACTOR="${{ github.actor }}"
-          SERVER_URL="${{ github.server_url }}"
           REPO_URL="${{ github.server_url }}/${{ github.repository }}"
-          COLOR=3447003
-          TITLE=""
-          DESCRIPTION=""
           URL="$REPO_URL"
+          COLOR=3447003
+          TITLE="$EVENT"
+
+          FIELD1_NAME="Repository"
+          FIELD1_VALUE="$REPO"
+          FIELD1_INLINE=true
+
+          FIELD2_NAME="Actor"
+          FIELD2_VALUE="$ACTOR"
+          FIELD2_INLINE=true
+
+          FIELD3_NAME="Action"
+          FIELD3_VALUE="${ACTION:-push}"
+          FIELD3_INLINE=true
+
+          FIELD4_NAME=""
+          FIELD4_VALUE=""
+          FIELD4_INLINE=false
 
           if [ "$EVENT" = "push" ]; then
             REF_NAME="${{ github.ref_name }}"
-            BEFORE="${{ github.event.before }}"
-            AFTER="${{ github.event.after }}"
             COMPARE_URL="${{ github.event.compare }}"
             URL="$COMPARE_URL"
-
-            COMMIT_LINES=$(jq -r '
-              .commits[:10][] |
-              "- `" + (.id[0:7]) + "` " + .message + " — **" + .author.name + "**"
-            ' "$GITHUB_EVENT_PATH")
+            TITLE="Push to ${REF_NAME}"
 
             COMMIT_COUNT=$(jq '.commits | length' "$GITHUB_EVENT_PATH")
 
-            TITLE="Push to ${REF_NAME}"
-            DESCRIPTION="**Repo:** ${REPO}\n**Actor:** ${ACTOR}\n**Commits:** ${COMMIT_COUNT}\n\n${COMMIT_LINES}"
+            COMMIT_LINES=$(jq -r '
+              .commits[:10]
+              | map("- `" + (.id[0:7]) + "` " + ((.message | split("\n")[0]) // "") + " — **" + .author.name + "**")
+              | join("\n")
+            ' "$GITHUB_EVENT_PATH")
+
+            if [ -z "$COMMIT_LINES" ] || [ "$COMMIT_LINES" = "null" ]; then
+              COMMIT_LINES="No commit details provided."
+            fi
+
+            FIELD1_NAME="Repository"
+            FIELD1_VALUE="$REPO"
+            FIELD1_INLINE=true
+
+            FIELD2_NAME="Branch/Tag"
+            FIELD2_VALUE="$REF_NAME"
+            FIELD2_INLINE=true
+
+            FIELD3_NAME="Actor"
+            FIELD3_VALUE="$ACTOR"
+            FIELD3_INLINE=true
+
+            FIELD4_NAME="Commits (${COMMIT_COUNT})"
+            FIELD4_VALUE="$COMMIT_LINES"
+            FIELD4_INLINE=false
 
           elif [ "$EVENT" = "pull_request" ]; then
             PR_TITLE=$(jq -r '.pull_request.title' "$GITHUB_EVENT_PATH")
@@ -72,25 +111,71 @@ jobs:
 
             if [ "$ACTION" = "closed" ] && [ "$MERGED" = "true" ]; then
               TITLE="PR merged: #${PR_NUM}"
-              DESCRIPTION="**${PR_TITLE}**\n**${HEAD}** → **${BASE}**\nMerged by **${ACTOR}**"
               COLOR=5763719
+              FIELD3_NAME="Merged by"
+              FIELD3_VALUE="$ACTOR"
             else
               TITLE="PR ${ACTION}: #${PR_NUM}"
-              DESCRIPTION="**${PR_TITLE}**\n**${HEAD}** → **${BASE}**\nBy **${ACTOR}**"
+              FIELD3_NAME="Actor"
+              FIELD3_VALUE="$ACTOR"
             fi
+
+            FIELD1_NAME="Title"
+            FIELD1_VALUE="$PR_TITLE"
+            FIELD1_INLINE=false
+
+            FIELD2_NAME="Source → Target"
+            FIELD2_VALUE="${HEAD} → ${BASE}"
+            FIELD2_INLINE=true
+
+            FIELD3_INLINE=true
+
+            FIELD4_NAME="Repository"
+            FIELD4_VALUE="$REPO"
+            FIELD4_INLINE=true
 
           elif [ "$EVENT" = "create" ]; then
             REF_TYPE=$(jq -r '.ref_type' "$GITHUB_EVENT_PATH")
             REF=$(jq -r '.ref' "$GITHUB_EVENT_PATH")
             TITLE="Created ${REF_TYPE}: ${REF}"
-            DESCRIPTION="**Repo:** ${REPO}\n**Actor:** ${ACTOR}"
+
+            FIELD1_NAME="Repository"
+            FIELD1_VALUE="$REPO"
+            FIELD1_INLINE=true
+
+            FIELD2_NAME="Type"
+            FIELD2_VALUE="$REF_TYPE"
+            FIELD2_INLINE=true
+
+            FIELD3_NAME="Name"
+            FIELD3_VALUE="$REF"
+            FIELD3_INLINE=true
+
+            FIELD4_NAME="Actor"
+            FIELD4_VALUE="$ACTOR"
+            FIELD4_INLINE=true
 
           elif [ "$EVENT" = "delete" ]; then
             REF_TYPE=$(jq -r '.ref_type' "$GITHUB_EVENT_PATH")
             REF=$(jq -r '.ref' "$GITHUB_EVENT_PATH")
             TITLE="Deleted ${REF_TYPE}: ${REF}"
-            DESCRIPTION="**Repo:** ${REPO}\n**Actor:** ${ACTOR}"
             COLOR=15158332
+
+            FIELD1_NAME="Repository"
+            FIELD1_VALUE="$REPO"
+            FIELD1_INLINE=true
+
+            FIELD2_NAME="Type"
+            FIELD2_VALUE="$REF_TYPE"
+            FIELD2_INLINE=true
+
+            FIELD3_NAME="Name"
+            FIELD3_VALUE="$REF"
+            FIELD3_INLINE=true
+
+            FIELD4_NAME="Actor"
+            FIELD4_VALUE="$ACTOR"
+            FIELD4_INLINE=true
 
           elif [ "$EVENT" = "release" ]; then
             TAG=$(jq -r '.release.tag_name' "$GITHUB_EVENT_PATH")
@@ -98,8 +183,23 @@ jobs:
             REL_URL=$(jq -r '.release.html_url' "$GITHUB_EVENT_PATH")
             URL="$REL_URL"
             TITLE="Release ${ACTION}: ${TAG}"
-            DESCRIPTION="**${NAME}**\nPublished by **${ACTOR}**"
             COLOR=10181046
+
+            FIELD1_NAME="Release"
+            FIELD1_VALUE="$NAME"
+            FIELD1_INLINE=false
+
+            FIELD2_NAME="Tag"
+            FIELD2_VALUE="$TAG"
+            FIELD2_INLINE=true
+
+            FIELD3_NAME="Actor"
+            FIELD3_VALUE="$ACTOR"
+            FIELD3_INLINE=true
+
+            FIELD4_NAME="Repository"
+            FIELD4_VALUE="$REPO"
+            FIELD4_INLINE=true
 
           elif [ "$EVENT" = "issues" ]; then
             NUM=$(jq -r '.issue.number' "$GITHUB_EVENT_PATH")
@@ -107,40 +207,100 @@ jobs:
             IURL=$(jq -r '.issue.html_url' "$GITHUB_EVENT_PATH")
             URL="$IURL"
             TITLE="Issue ${ACTION}: #${NUM}"
-            DESCRIPTION="**${ITITLE}**\nBy **${ACTOR}**"
+
+            FIELD1_NAME="Title"
+            FIELD1_VALUE="$ITITLE"
+            FIELD1_INLINE=false
+
+            FIELD2_NAME="Number"
+            FIELD2_VALUE="#${NUM}"
+            FIELD2_INLINE=true
+
+            FIELD3_NAME="Actor"
+            FIELD3_VALUE="$ACTOR"
+            FIELD3_INLINE=true
+
+            FIELD4_NAME="Repository"
+            FIELD4_VALUE="$REPO"
+            FIELD4_INLINE=true
 
           elif [ "$EVENT" = "discussion" ]; then
             DTITLE=$(jq -r '.discussion.title' "$GITHUB_EVENT_PATH")
             DURL=$(jq -r '.discussion.html_url' "$GITHUB_EVENT_PATH")
             URL="$DURL"
             TITLE="Discussion ${ACTION}"
-            DESCRIPTION="**${DTITLE}**\nBy **${ACTOR}**"
+
+            FIELD1_NAME="Title"
+            FIELD1_VALUE="$DTITLE"
+            FIELD1_INLINE=false
+
+            FIELD2_NAME="Actor"
+            FIELD2_VALUE="$ACTOR"
+            FIELD2_INLINE=true
+
+            FIELD3_NAME="Repository"
+            FIELD3_VALUE="$REPO"
+            FIELD3_INLINE=true
+
+            FIELD4_NAME=""
+            FIELD4_VALUE=""
+            FIELD4_INLINE=false
 
           elif [ "$EVENT" = "discussion_comment" ]; then
             DURL=$(jq -r '.comment.html_url' "$GITHUB_EVENT_PATH")
             URL="$DURL"
             TITLE="Discussion comment ${ACTION}"
-            DESCRIPTION="By **${ACTOR}**"
 
-          else
-            TITLE="${EVENT}"
-            DESCRIPTION="Action: ${ACTION}\nActor: ${ACTOR}"
+            FIELD1_NAME="Repository"
+            FIELD1_VALUE="$REPO"
+            FIELD1_INLINE=true
+
+            FIELD2_NAME="Actor"
+            FIELD2_VALUE="$ACTOR"
+            FIELD2_INLINE=true
+
+            FIELD3_NAME="Action"
+            FIELD3_VALUE="$ACTION"
+            FIELD3_INLINE=true
+
+            FIELD4_NAME=""
+            FIELD4_VALUE=""
+            FIELD4_INLINE=false
           fi
 
           jq -n \
             --arg username "GitHub • edgar-sec" \
             --arg title "$TITLE" \
-            --arg description "$DESCRIPTION" \
             --arg url "$URL" \
+            --arg f1n "$FIELD1_NAME" \
+            --arg f1v "$FIELD1_VALUE" \
+            --argjson f1i "$FIELD1_INLINE" \
+            --arg f2n "$FIELD2_NAME" \
+            --arg f2v "$FIELD2_VALUE" \
+            --argjson f2i "$FIELD2_INLINE" \
+            --arg f3n "$FIELD3_NAME" \
+            --arg f3v "$FIELD3_VALUE" \
+            --argjson f3i "$FIELD3_INLINE" \
+            --arg f4n "$FIELD4_NAME" \
+            --arg f4v "$FIELD4_VALUE" \
+            --argjson f4i "$FIELD4_INLINE" \
             --argjson color "$COLOR" \
             '{
               username: $username,
               embeds: [
                 {
                   title: $title,
-                  description: $description,
                   url: $url,
-                  color: $color
+                  color: $color,
+                  fields: (
+                    [
+                      {name: $f1n, value: $f1v, inline: $f1i},
+                      {name: $f2n, value: $f2v, inline: $f2i},
+                      {name: $f3n, value: $f3v, inline: $f3i},
+                      {name: $f4n, value: $f4v, inline: $f4i}
+                    ]
+                    | map(select(.name != "" and .value != ""))
+                  )
                 }
               ]
             }' > discord_payload.json
