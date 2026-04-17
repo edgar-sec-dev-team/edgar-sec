@@ -13,6 +13,7 @@ jobs:
   notify:
     if: ${{ github.event.workflow_run.name != 'Workflow Status to Discord' }}
     runs-on: ubuntu-latest
+
     steps:
       - name: Build Discord payload
         shell: bash
@@ -21,17 +22,19 @@ jobs:
           HTML_URL=$(jq -r '.workflow_run.html_url' "$GITHUB_EVENT_PATH")
           CONCLUSION=$(jq -r '.workflow_run.conclusion // empty' "$GITHUB_EVENT_PATH")
           STATUS=$(jq -r '.workflow_run.status' "$GITHUB_EVENT_PATH")
-          EVENT=$(jq -r '.workflow_run.event' "$GITHUB_EVENT_PATH")
+          EVENT=$(jq -r '.workflow_run.event // "unknown"' "$GITHUB_EVENT_PATH")
           BRANCH=$(jq -r '.workflow_run.head_branch // "unknown"' "$GITHUB_EVENT_PATH")
-          ACTOR=$(jq -r '.workflow_run.actor.login // .sender.login' "$GITHUB_EVENT_PATH")
+          ACTOR=$(jq -r '.workflow_run.actor.login // .sender.login // "unknown"' "$GITHUB_EVENT_PATH")
+
+          if [ "$EVENT" = "dynamic" ]; then
+            EVENT="internal"
+          fi
 
           COLOR=3447003
           TITLE="Workflow requested"
-          DESCRIPTION="**${NAME}**\nEvent: **${EVENT}**\nBranch: **${BRANCH}**\nActor: **${ACTOR}**"
 
           if [ "$STATUS" = "completed" ]; then
             TITLE="Workflow completed: ${CONCLUSION}"
-            DESCRIPTION="**${NAME}**\nEvent: **${EVENT}**\nBranch: **${BRANCH}**\nActor: **${ACTOR}**"
 
             if [ "$CONCLUSION" = "success" ]; then
               COLOR=5763719
@@ -47,7 +50,10 @@ jobs:
           jq -n \
             --arg username "GitHub Actions • edgar-sec" \
             --arg title "$TITLE" \
-            --arg description "$DESCRIPTION" \
+            --arg name "$NAME" \
+            --arg event "$EVENT" \
+            --arg branch "$BRANCH" \
+            --arg actor "$ACTOR" \
             --arg url "$HTML_URL" \
             --argjson color "$COLOR" \
             '{
@@ -55,9 +61,30 @@ jobs:
               embeds: [
                 {
                   title: $title,
-                  description: $description,
                   url: $url,
-                  color: $color
+                  color: $color,
+                  fields: [
+                    {
+                      name: "Workflow",
+                      value: $name,
+                      inline: false
+                    },
+                    {
+                      name: "Event",
+                      value: $event,
+                      inline: true
+                    },
+                    {
+                      name: "Branch",
+                      value: $branch,
+                      inline: true
+                    },
+                    {
+                      name: "Actor",
+                      value: $actor,
+                      inline: true
+                    }
+                  ]
                 }
               ]
             }' > discord_payload.json
