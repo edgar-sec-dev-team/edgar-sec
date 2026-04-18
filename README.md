@@ -1,6 +1,6 @@
 # edgar-sec
 
-# The dev team is planning and working on a complete rebuild and overhaul of this package. Pleas be patient as seek to provide an extremely powerful and useable tool for financial researchers and professionals.
+# The dev team is planning and working on a complete rebuild and overhaul of this package. Please be patient as we seek to provide an extremely powerful and useable tool for financial researchers and professionals.
 
 ## A feature-rich python package for interacting with the US Securities and Exchange Commission API: EDGAR
 
