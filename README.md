@@ -1,5 +1,5 @@
 <div align="center">
-    <img src="https://github.com/nikhilxsunder/edgar-sec/blob/main/assets/exported/edgar-sec-banner.png" width="30%" alt="Edgar-SEC Logo">
+    <img src="https://github.com/nikhilxsunder/edgar-sec/blob/main/assets/exported/edgar-sec-banner.png"alt="Edgar-SEC Logo">
 </div>
 # The dev team is planning and working on a complete rebuild and overhaul of this package. Please be patient as we seek to provide an extremely powerful and useable tool for financial researchers and professionals.
 
